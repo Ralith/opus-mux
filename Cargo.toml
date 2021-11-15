@@ -1,0 +1,17 @@
+[package]
+name = "opus-mux"
+version = "0.0.0"
+edition = "2021"
+description = "Extracts an encoded Opus stream from an Opus file per RFC 7845"
+authors = ["Benjamin Saunders <ben.e.saunders@gmail.com>"]
+license = "MIT OR Apache-2.0 OR Zlib"
+repository = "https://github.com/Ralith/opus-mux"
+keywords = ["opus", "ogg"]
+categories = ["multimedia::audio", "multimedia::encoding", "no-std"]
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+ogg = "0.8"
