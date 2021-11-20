@@ -172,6 +172,12 @@ impl Demuxer {
     }
 }
 
+impl Default for Demuxer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct Header {
