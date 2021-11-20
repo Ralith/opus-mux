@@ -56,6 +56,7 @@ impl Demuxer {
                     )
                     .map_err(|_| Error::Malformed)?;
                     self.need_bytes = segment_bytes;
+                    self.got_segments = false;
                     cursor += HEADER_SIZE;
                     parser
                 }
