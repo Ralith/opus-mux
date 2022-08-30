@@ -12,6 +12,3 @@ categories = ["multimedia::audio", "multimedia::encoding", "no-std"]
 [features]
 default = ["std"]
 std = []
-
-[dependencies]
-ogg = "0.8"
