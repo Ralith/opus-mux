@@ -1,6 +1,6 @@
 [package]
 name = "opus-mux"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 description = "Extracts an encoded Opus stream from an Opus file per RFC 7845"
 authors = ["Benjamin Saunders <ben.e.saunders@gmail.com>"]
