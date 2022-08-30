@@ -12,3 +12,7 @@ categories = ["multimedia::audio", "multimedia::encoding", "no-std"]
 [features]
 default = ["std"]
 std = []
+
+[dev-dependencies]
+magnum-opus = "0.3"
+hound = "3.4"
