@@ -19,6 +19,7 @@ fn main() {
     };
 
     let mut decoder = Decoder::new(48000, channels).unwrap();
+    decoder.set_gain(header.output_gain.into()).unwrap();
     let mut writer = hound::WavWriter::create(
         &args[2],
         hound::WavSpec {
@@ -31,13 +32,17 @@ fn main() {
     .unwrap();
     let mut total = 0;
     let mut buf = Vec::new();
+    let mut skip = header.pre_skip;
     while let Some(packet) = demuxer.next() {
         let n = decoder.get_nb_samples(packet).unwrap();
         total += n;
         let samples = n * usize::from(header.channels);
         buf.resize(samples, 0);
         decoder.decode(packet, &mut buf, false).unwrap();
-        let mut writer = writer.get_i16_writer(samples as u32);
+        let skipped = buf.len().min(skip as usize) as u16;
+        buf.drain(..skipped as usize);
+        skip -= skipped;
+        let mut writer = writer.get_i16_writer(buf.len() as u32);
         for &x in &buf {
             writer.write_sample(x);
         }
