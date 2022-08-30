@@ -15,7 +15,7 @@ pub struct Demuxer {
     stream: ogg::Stream,
 
     // Packet decoding state
-    header: Option<Header>,
+    header: Option<InternalHeader>,
     tags: Option<Box<[u8]>>,
 }
 
@@ -59,23 +59,25 @@ impl Demuxer {
                         {
                             continue;
                         }
-                        self.header = Some(Header {
+                        self.header = Some(InternalHeader {
                             serial: page_header.stream_serial,
-                            channels: packet[9],
-                            pre_skip: u16::from_le_bytes(
-                                packet
-                                    .get(10..12)
-                                    .ok_or(Error::Malformed)?
-                                    .try_into()
-                                    .unwrap(),
-                            ),
-                            output_gain: i16::from_le_bytes(
-                                packet
-                                    .get(16..18)
-                                    .ok_or(Error::Malformed)?
-                                    .try_into()
-                                    .unwrap(),
-                            ),
+                            header: Header {
+                                channels: packet[9],
+                                pre_skip: u16::from_le_bytes(
+                                    packet
+                                        .get(10..12)
+                                        .ok_or(Error::Malformed)?
+                                        .try_into()
+                                        .unwrap(),
+                                ),
+                                output_gain: i16::from_le_bytes(
+                                    packet
+                                        .get(16..18)
+                                        .ok_or(Error::Malformed)?
+                                        .try_into()
+                                        .unwrap(),
+                                ),
+                            },
                         });
                         break;
                     }
@@ -110,7 +112,7 @@ impl Demuxer {
     /// Access the decoded `Header`, if available
     #[inline]
     pub fn header(&self) -> Option<&Header> {
-        self.header.as_ref()
+        self.header.as_ref().map(|x| &x.header)
     }
 
     /// Extract the Opus tags, if available. Will not return `Some` before `header` does.
@@ -147,10 +149,13 @@ impl Default for Demuxer {
     }
 }
 
-#[non_exhaustive]
+struct InternalHeader {
+    serial: u32,
+    header: Header,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Header {
-    serial: u32,
     /// Number of channels
     pub channels: u8,
     /// Number of samples to discard from the decoder output when starting playback
