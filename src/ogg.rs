@@ -84,15 +84,20 @@ impl Stream {
             }
             if self.segment == 0 {
                 self.packet_start = r.cursor;
-            }
-            if continued && self.packet.is_empty() {
-                // Skip incomplete packet
-                for &len in &segments[..segment_count] {
-                    self.packet_start += len as usize;
-                    self.segment += 1;
-                    if len != u8::MAX {
-                        break;
+                // Skip incomplete packets
+                if continued && self.packet.is_empty() {
+                    // Tail without head
+                    for &len in &segments[..segment_count] {
+                        self.packet_start += len as usize;
+                        self.segment += 1;
+                        if len != u8::MAX {
+                            break;
+                        }
                     }
+                }
+                if !continued && !self.packet.is_empty() {
+                    // Head without tail
+                    self.packet.clear();
                 }
             }
 
