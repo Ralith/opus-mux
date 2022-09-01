@@ -4,8 +4,8 @@ use core::ops::Range;
 #[derive(Default)]
 pub struct Stream {
     buffer: VecDeque<u8>,
-    /// Data buffered for the current packet
-    packet: Vec<u8>,
+    /// Data buffered for the current packet, for each logical stream
+    stream_packets: Vec<(u32, Vec<u8>)>,
     /// Position in the segment table of the current page
     segment: usize,
     /// Offset of the current packet's start
@@ -60,6 +60,16 @@ impl Stream {
             if self.segment == segment_count {
                 self.segment = 0;
                 self.buffer.drain(..self.packet_start);
+                if eos {
+                    // Free buffer for finished logical stream
+                    if let Some(index) = self
+                        .stream_packets
+                        .iter()
+                        .position(|&(s, _)| s == stream_serial)
+                    {
+                        self.stream_packets.swap_remove(index);
+                    }
+                }
                 continue;
             }
 
@@ -85,19 +95,25 @@ impl Stream {
             if self.segment == 0 {
                 self.packet_start = r.cursor;
                 // Skip incomplete packets
-                if continued && self.packet.is_empty() {
-                    // Tail without head
-                    for &len in &segments[..segment_count] {
-                        self.packet_start += len as usize;
-                        self.segment += 1;
-                        if len != u8::MAX {
-                            break;
+                if let Some((_, packet)) = self
+                    .stream_packets
+                    .iter_mut()
+                    .find(|&&mut (s, _)| s == stream_serial)
+                {
+                    if continued && packet.is_empty() {
+                        // Tail without head
+                        for &len in &segments[..segment_count] {
+                            self.packet_start += len as usize;
+                            self.segment += 1;
+                            if len != u8::MAX {
+                                break;
+                            }
                         }
                     }
-                }
-                if !continued && !self.packet.is_empty() {
-                    // Head without tail
-                    self.packet.clear();
+                    if !continued && !packet.is_empty() {
+                        // Head without tail
+                        packet.clear();
+                    }
                 }
             }
 
@@ -133,23 +149,39 @@ impl<'a> Page<'a> {
 
     /// Read the next packet from this page
     pub fn next(&mut self) -> Option<&[u8]> {
-        self.next_inner()?;
-        Some(&self.stream.packet)
+        let i = self.next_inner()?;
+        Some(&self.stream.stream_packets[i].1)
     }
 
     /// Read the next packet from this page and borrow it from the `Stream`
     pub fn into_next(mut self) -> Option<&'a [u8]> {
-        self.next_inner()?;
-        Some(&self.stream.packet)
+        let i = self.next_inner()?;
+        Some(&self.stream.stream_packets[i].1)
     }
 
-    fn next_inner(&mut self) -> Option<()> {
+    fn next_inner(&mut self) -> Option<usize> {
         if self.stream.segment >= self.segment_count {
             return None;
         }
 
+        let packet_index = match self
+            .stream
+            .stream_packets
+            .iter()
+            .position(|&(s, _)| s == self.header.stream_serial)
+        {
+            Some(x) => x,
+            None => {
+                let i = self.stream.stream_packets.len();
+                self.stream
+                    .stream_packets
+                    .push((self.header.stream_serial, Vec::new()));
+                i
+            }
+        };
+
         if !self.stream.packet_continued {
-            self.stream.packet.clear();
+            self.stream.stream_packets[packet_index].1.clear();
         }
 
         // Copy out all segments from the current packet
@@ -169,7 +201,7 @@ impl<'a> Page<'a> {
         fill(
             &self.stream.buffer,
             self.stream.packet_start..packet_end,
-            &mut self.stream.packet,
+            &mut self.stream.stream_packets[packet_index].1,
         )?;
 
         // Set up for the next packet in the stream
@@ -177,7 +209,7 @@ impl<'a> Page<'a> {
         self.stream.segment = segment;
 
         if !self.stream.packet_continued {
-            Some(())
+            Some(packet_index)
         } else {
             None
         }
